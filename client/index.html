@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width"/>
+    <title>AviaSchedule</title>
+    <!-- <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" /> -->
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <!-- <link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css" rel="stylesheet" /> -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+</head>
+<body>
+
+<button onclick="if (prompt('Введите пароль')==='admin'){
+                    location.href = 'admin.html';
+                } else{
+                    alert('Неверный пароль!');
+                }"
+        type="button" id="adminBtn" class="admin">Администратор
+</button>
+
+
+<div id="headline">
+    <h1>AviaSchedule</h1>
+    <h3>Расписание всех авиарейсов в одном месте!</h3>
+</div>
+
+<form name="ticketForm" class="clientForm">
+    <input type="hidden" name="id" value="0"/>
+    <div class="form-group">
+        <input class="form-control" name="from" id="from" type="text"
+               placeholder="&nbsp;&nbsp;Город отправления" autocomplete="off"/>
+    </div>
+    <br>
+    <div class="form-group">
+        <input class="form-control" name="to" id="to" type="text"
+               placeholder="&nbsp;&nbsp;Город прибытия" autocomplete="off"/>
+    </div>
+    <br>
+    <div class="panel-body">
+        <button type="submit" class="adminButton">Найти</button>
+        <a id="reset" class="btn btn-sm btn-primary">Отменить</a>
+    </div>
+</form>
+
+<table align="center" class="table">
+    <thead>
+    <tr>
+        <th>Город отправления</th>
+        <th>Город прибытия</th>
+        <th>Дата и время отправления</th>
+        <th>Дата и время прибытия</th>
+        <th>Цена</th>
+        <th>Номер рейса</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<script>
+    function GetTickets() {
+        $.ajax({
+            url: "/api/tickets/admin",
+            type: "GET",
+            contentType: "application/json",
+            success: function (tickets) {
+                var rows = "";
+                $.each(tickets, function (index, ticket) {
+                    rows += row(ticket);
+                })
+                $("table tbody").append(rows);
+            }
+        });
+    }
+
+    function GetTicketsByFilter(To, From) {
+        console.log(From)
+        $.ajax({
+            url: `/api/tickets/${From}`,
+            type: "GET",
+            contentType: "application/json",
+            success: function (tickets) {
+                var rows = "";
+                $.each(tickets, function (index, ticket) {
+                    console.log(To + " --- " + From)
+                    console.log(tickets[index].to + " -- " + tickets[index].from)
+                    if (tickets[index].to === To.trim() || To.trim() === "")
+                        rows += row(ticket)
+                })
+                $("table tbody").html("")
+                $("table tbody").append(rows);
+            }
+        });
+    }
+
+    function GetTicket(id) {
+        $.ajax({
+            url: "/api/tickets/" + id,
+            type: "GET",
+            contentType: "application/json",
+            success: function (ticket) {
+                var form = document.forms["ticketForm"];
+                form.elements["id"].value = ticket._id;
+                form.elements["to"].value = ticket.to;
+                form.elements["from"].value = ticket.from;
+                form.elements["dateTo"].value = ticket.dateTo;
+                form.elements["dateFrom"].value = ticket.dateFrom;
+                form.elements["price"].value = ticket.price;
+                form.elements["airplane"].value = ticket.airplane;
+            }
+        });
+    }
+
+    function CreateTicket(to, from, dateTo, dateFrom, price) {
+        $.ajax({
+            url: "api/tickets",
+            contentType: "application/json",
+            method: "POST",
+            data: JSON.stringify({
+                to: to,
+                from: from,
+                dateTo: dateTo,
+                dateFrom: dateFrom,
+                price: price,
+                airplane: airplane
+            }),
+            success: function (ticket) {
+                reset();
+                $("table tbody").append(row(ticket));
+            }
+        })
+    }
+
+    function EditTicket(id, to, from, dateTo, dateFrom, price, airplane) {
+        $.ajax({
+            url: "api/tickets",
+            contentType: "application/json",
+            method: "PUT",
+            data: JSON.stringify({
+                id: id,
+                to: to,
+                from: from,
+                dateTo: dateTo,
+                dateFrom: dateFrom,
+                price: price,
+                airplane: airplane
+            }),
+            success: function (ticket) {
+                reset();
+                console.log(ticket);
+                $("tr[data-rowid='" + ticket._id + "']").replaceWith(row(ticket));
+                location.reload();
+            }
+        })
+    }
+
+    function reset() {
+        var form = document.forms["ticketForm"];
+        form.reset();
+        form.elements["id"].value = 0;
+    }
+
+    function DeleteTicket(id) {
+        $.ajax({
+            url: "api/ticket/" + id,
+            contentType: "application/json",
+            method: "DELETE",
+            success: function (ticket) {
+                console.log(ticket);
+                $("tr[data-rowid='" + ticket._id + "']").remove();
+                location.reload();
+            }
+        })
+    }
+
+    var row = function (ticket) {
+        return "<tr>" +
+            "<td>" + ticket.from + "</td> <td>" + ticket.to + "</td>" +
+            "<td>" + ticket.dateTo + "</td> <td>" + ticket.dateFrom + "</td>" +
+            "<td>" + ticket.price + "</td>" + "<td>" + ticket.airplane + "</td>";
+    }
+    $("#reset").click(function (e) {
+
+        e.preventDefault();
+        reset();
+    })
+
+    $("form").submit(function (e) {
+        e.preventDefault();
+        var to = document.getElementById("to").value;
+        var from = document.getElementById("from").value;
+        GetTicketsByFilter(to, from);
+    });
+
+    $("body").on("click", ".editLink", function () {
+        var id = $(this).data("id");
+        GetTicket(id);
+    })
+    /*$("body").on("click", ".removeLink", function () {
+        var id = $(this).data("id");
+        var to = $(this).data("to");
+        var from = $(this).data("from");
+        var dateTo = $(this).data("dateTo");
+        var dateFrom = $(this).data("dateFrom");
+        var price = $(this).data("price");
+        EditTicket(id, to, from, dateTo, dateFrom, price, airplane);
+    })*/
+
+    //GetTicketsByFilter(to, from, dateTo, dateFrom);
+</script>
+</body>
+</html>
